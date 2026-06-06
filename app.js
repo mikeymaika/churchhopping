@@ -1,3 +1,10 @@
+const SUPABASE_URL = 'https://wjembxkybxpsardbmkra.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZW1ieGt5Ynhwc2FyZGJta3JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjA2MDYsImV4cCI6MjA5NjMzNjYwNn0.8Yy2N38pVjxnaNXbHOSbCM8iCcZ4vl3AGDdZQgCwVtU'
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+)
 const storageKey = "checkpoint-map-state-v1";
 const photoDbName = "checkpoint-map-photos";
 const photoStoreName = "photos";
