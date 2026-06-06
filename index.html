@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Main</title>
+    <link rel="stylesheet" href="styles.css?v=35">
+  </head>
+  <body>
+    <main id="mapPage" class="app-shell">
+      <section class="map-panel" aria-label="Checkpoint map">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Church Hopping</p>
+            <h1>Main</h1>
+          </div>
+          <div class="toolbar" aria-label="Map actions">
+            <div class="page-tabs" aria-label="Pages">
+              <button id="mapPageButton" class="nav-button active" type="button">Map</button>
+              <button id="routePageButton" class="nav-button" type="button">Route Planner</button>
+            </div>
+            <div class="menu-wrap">
+              <button id="menuButton" class="nav-button" type="button" aria-expanded="false">Menu</button>
+              <div id="actionsMenu" class="actions-menu is-hidden">
+                <button id="resetMapButton" type="button">Reset the current map source</button>
+                <button id="exportButton" type="button">Export your checkpoints and route data</button>
+                <label>
+                  <span>Import checkpoints and route data</span>
+                  <input id="importInput" type="file" accept="application/json,.json">
+                </label>
+                <button id="clearButton" class="menu-danger" type="button">Delete all checkpoints and reset the map data</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="source-bar" aria-label="Map source">
+          <form id="googleMapForm" class="google-form">
+            <input id="googleMapInput" type="text" placeholder="Address, place, coordinates, or Google Maps link" autocomplete="off">
+            <button id="googleMapSearchButton" class="primary-button" type="submit">Search</button>
+          </form>
+          <div class="map-controls" aria-label="Map controls">
+            <button id="mapModeButton" class="mode-button" type="button" aria-pressed="false">Add pins</button>
+          </div>
+          <p id="searchStatus" class="search-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <div class="map-wrap">
+          <div id="mapSurface" class="map-surface" role="application" aria-label="Click anywhere on the map to add a checkpoint">
+            <div id="googleMapCanvas" class="google-canvas" aria-label="Google map"></div>
+            <div class="map-art" aria-hidden="true">
+              <div class="water"></div>
+              <div class="trail trail-one"></div>
+              <div class="trail trail-two"></div>
+              <div class="ridge ridge-one"></div>
+              <div class="ridge ridge-two"></div>
+              <div class="landmark camp">Camp</div>
+              <div class="landmark lookout">Lookout</div>
+              <div class="landmark bridge">Bridge</div>
+            </div>
+            <div id="markerLayer" class="marker-layer" aria-live="polite"></div>
+            <p id="emptyHint" class="empty-hint">Click the map to add your first checkpoint.</p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="notes-panel" aria-label="Checkpoint notes">
+        <section class="editor">
+          <div class="panel-heading">
+            <p class="eyebrow">Selected</p>
+            <h2 id="editorTitle">No checkpoint selected</h2>
+          </div>
+
+          <form id="noteForm" class="note-form">
+            <label>
+              <span>Name</span>
+              <input id="titleInput" type="text" placeholder="Checkpoint name" disabled>
+            </label>
+            <label>
+              <span>Opening hours</span>
+              <input id="openingHoursInput" type="text" placeholder="e.g. Mon-Fri 09:00-18:00" disabled>
+            </label>
+            <label>
+              <span>Notes</span>
+              <textarea id="noteInput" rows="7" placeholder="What should you remember here?" disabled></textarea>
+            </label>
+            <div class="status-row">
+              <div class="status-options">
+                <label class="toggle">
+                  <input id="doneInput" type="checkbox" disabled>
+                  <span>Done</span>
+                </label>
+                <label class="toggle">
+                  <input id="notInsideInput" type="checkbox" disabled>
+                  <span>Haven't been inside</span>
+                </label>
+              </div>
+              <p id="positionText">No position</p>
+            </div>
+            <div class="photo-section">
+              <div class="photo-actions">
+                <p>Photos</p>
+                <label class="photo-button">
+                  <span>Add photos</span>
+                  <input id="photoInput" type="file" accept="image/*" multiple disabled>
+                </label>
+              </div>
+              <div id="photoGallery" class="photo-gallery" aria-live="polite"></div>
+            </div>
+            <button id="addToRouteButton" class="primary-button wide" type="button" disabled>Add to my route</button>
+            <button id="addToMustSeeButton" class="secondary-button wide" type="button" disabled>Add to must see</button>
+            <button id="deleteButton" class="danger-button wide" type="button" disabled>Delete checkpoint</button>
+          </form>
+        </section>
+
+        <section class="list-section">
+          <div class="panel-heading">
+            <p class="eyebrow">Route</p>
+            <h2>Checkpoints</h2>
+          </div>
+          <div id="checkpointList" class="checkpoint-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <section id="routePage" class="route-page is-hidden" aria-label="Route planner">
+      <header class="topbar route-topbar">
+        <div>
+          <p class="eyebrow">Route Planner</p>
+          <h1>Where to go?</h1>
+        </div>
+        <div class="toolbar">
+          <button id="routeMapButton" class="nav-button" type="button">Map</button>
+          <button id="routePlannerButton" class="nav-button active" type="button">Route Planner</button>
+          <button id="clearRouteButton" class="danger-button" type="button">Clear selected date</button>
+        </div>
+      </header>
+
+      <section class="date-selector" aria-label="Route date selector">
+        <div id="routeDateSelector" class="date-strip"></div>
+      </section>
+
+      <div class="route-layout">
+        <section class="route-main">
+          <div class="panel-heading route-plan-heading">
+            <div>
+              <p class="eyebrow">Plan</p>
+              <h2 id="routeDateTitle">Today</h2>
+            </div>
+            <label class="toggle route-done-toggle">
+              <input id="routeDoneInput" type="checkbox">
+              <span>Done</span>
+            </label>
+          </div>
+          <div id="routeList" class="route-list"></div>
+        </section>
+
+        <aside class="route-history-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">History</p>
+            <h2>Plans by date</h2>
+          </div>
+          <div id="routeHistoryList" class="route-history-list"></div>
+        </aside>
+      </div>
+    </section>
+
+    <script src="app.js?v=35"></script>
+  </body>
+</html>
