@@ -135,7 +135,35 @@ function hasGoogleMap() {
   return Boolean(state.googleMapQuery && state.googleMapCenter);
 }
 
-function loadState() {
+async function loadState() {
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("data")
+    .eq("id", "main")
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  if (!data?.data) {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return;
+
+    try {
+      const parsed = JSON.parse(saved);
+      await saveStateToSupabase(parsed);
+      applyLoadedState(parsed);
+    } catch {
+      localStorage.removeItem(storageKey);
+    }
+
+    return;
+  }
+
+  applyLoadedState(data.data);
+}
   const saved = localStorage.getItem(storageKey);
   if (!saved) return;
 
