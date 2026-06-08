@@ -1,14 +1,11 @@
-const SUPABASE_URL = 'https://wjembxkybxpsardbmkra.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZW1ieGt5Ynhwc2FyZGJta3JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjA2MDYsImV4cCI6MjA5NjMzNjYwNn0.8Yy2N38pVjxnaNXbHOSbCM8iCcZ4vl3AGDdZQgCwVtU'
-
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-)
 const storageKey = "checkpoint-map-state-v1";
 const photoDbName = "checkpoint-map-photos";
 const photoStoreName = "photos";
 const googleMapsApiKey = "AIzaSyD9kGCaluN0auzX_ch_gZRX3ul1RhrjUI0";
+const supabaseProjectUrl = "https://wjembxkybxpsardbmkra.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZW1ieGt5Ynhwc2FyZGJta3JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjA2MDYsImV4cCI6MjA5NjMzNjYwNn0.8Yy2N38pVjxnaNXbHOSbCM8iCcZ4vl3AGDdZQgCwVtU";
+const cloudStateTable = "shared_map_state";
+const cloudStateId = "main";
 const appLocale = "en";
 const mustSeeRouteKey = "must-see";
 const mustSeeRouteLabel = "Must see";
@@ -74,6 +71,9 @@ let googleGeocoder = null;
 let googleMarkers = [];
 let googleProjectionOverlay = null;
 let photoDbPromise = null;
+let cloudReady = false;
+let cloudSaveTimer = null;
+let lastCloudStateJson = "";
 
 function makeId() {
   return `checkpoint-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -135,58 +135,53 @@ function hasGoogleMap() {
   return Boolean(state.googleMapQuery && state.googleMapCenter);
 }
 
-async function loadState() {
-  const { data, error } = await supabase
-    .from("app_state")
-    .select("data")
-    .eq("id", "main")
-    .maybeSingle();
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  if (!data?.data) {
-    const saved = localStorage.getItem(storageKey);
-    if (!saved) return;
-
-    try {
-      const parsed = JSON.parse(saved);
-      await saveStateToSupabase(parsed);
-      applyLoadedState(parsed);
-    } catch {
-      localStorage.removeItem(storageKey);
-    }
-
-    return;
-  }
-
-  applyLoadedState(data.data);
+function normalizePoint(point, index = 0) {
+  return {
+    id: point.id || makeId(),
+    title: point.title || `Checkpoint ${index + 1}`,
+    note: point.note || "",
+    openingHours: point.openingHours || "",
+    x: isNumber(point.x) ? Number(point.x) : undefined,
+    y: isNumber(point.y) ? Number(point.y) : undefined,
+    lat: isNumber(point.lat) ? Number(point.lat) : undefined,
+    lng: isNumber(point.lng) ? Number(point.lng) : undefined,
+    photos: normalizePhotos(point.photos).map((photo) => ({ id: photo.id, name: photo.name })),
+    done: Boolean(point.done),
+    notInside: Boolean(point.notInside),
+    createdAt: point.createdAt || new Date().toISOString(),
+  };
 }
+
+function applySavedState(parsed, options = {}) {
+  const previousSelectedId = state.selectedId;
+  state.points = Array.isArray(parsed.points)
+    ? parsed.points.map((point, index) => normalizePoint(point, index))
+    : [];
+  state.selectedId = options.keepSelection && state.points.some((point) => point.id === previousSelectedId)
+    ? previousSelectedId
+    : parsed.selectedId || state.points[0]?.id || null;
+  state.mapImage = parsed.mapImage || "";
+  state.googleMapQuery = parsed.googleMapQuery || "";
+  state.googleMapCenter = parsed.googleMapCenter || null;
+  state.googleMapZoom = parsed.googleMapZoom || 14;
+  state.mapMode = parsed.mapMode === "browse" ? "browse" : "add";
+  state.routePlans = normalizeRoutePlans(parsed.routePlans);
+  state.activeRouteDate = isValidRouteKey(parsed.activeRouteDate) ? parsed.activeRouteDate : activeRouteKey();
+  state.activeView = parsed.activeView === "route" ? "route" : "map";
+}
+
+function loadState() {
   const saved = localStorage.getItem(storageKey);
   if (!saved) return;
 
   try {
-    const parsed = JSON.parse(saved);
-    state.points = Array.isArray(parsed.points)
-      ? parsed.points.map((point) => ({ ...point, photos: normalizePhotos(point.photos) }))
-      : [];
-    state.selectedId = parsed.selectedId || state.points[0]?.id || null;
-    state.mapImage = parsed.mapImage || "";
-    state.googleMapQuery = parsed.googleMapQuery || "";
-    state.googleMapCenter = parsed.googleMapCenter || null;
-    state.googleMapZoom = parsed.googleMapZoom || 14;
-    state.mapMode = parsed.mapMode === "browse" ? "browse" : "add";
-    state.routePlans = normalizeRoutePlans(parsed.routePlans);
-    state.activeRouteDate = isValidRouteKey(parsed.activeRouteDate) ? parsed.activeRouteDate : todayKey();
-    state.activeView = parsed.activeView === "route" ? "route" : "map";
+    applySavedState(JSON.parse(saved));
   } catch {
     localStorage.removeItem(storageKey);
   }
 }
 
-function saveState() {
+function saveState(options = {}) {
   const lightState = {
     ...state,
     points: state.points.map((point) => ({
@@ -199,6 +194,100 @@ function saveState() {
   };
 
   localStorage.setItem(storageKey, JSON.stringify(lightState));
+  if (!options.localOnly) scheduleCloudSave();
+}
+
+function sharedStateSnapshot() {
+  return {
+    points: state.points.map((point, index) => normalizePoint(point, index)),
+    mapImage: state.mapImage,
+    googleMapQuery: state.googleMapQuery,
+    googleMapCenter: state.googleMapCenter,
+    googleMapZoom: state.googleMapZoom,
+    routePlans: state.routePlans,
+  };
+}
+
+function hasSharedStateData(data) {
+  return Boolean(
+    data &&
+      (Array.isArray(data.points) && data.points.length > 0 ||
+        data.googleMapQuery ||
+        Object.keys(data.routePlans || {}).length > 0),
+  );
+}
+
+function applyCloudState(data) {
+  if (!data || typeof data !== "object") return false;
+
+  applySavedState(
+    {
+      ...data,
+      selectedId: state.selectedId,
+      activeRouteDate: state.activeRouteDate,
+      activeView: state.activeView,
+      mapMode: state.mapMode,
+    },
+    { keepSelection: true },
+  );
+  saveState({ localOnly: true });
+  render();
+  return true;
+}
+
+function scheduleCloudSave() {
+  if (!cloudReady) return;
+
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    saveCloudState().catch((error) => console.warn("Could not sync map data.", error));
+  }, 900);
+}
+
+function supabaseHeaders(extraHeaders = {}) {
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    ...extraHeaders,
+  };
+}
+
+async function saveCloudState() {
+  const data = sharedStateSnapshot();
+  const dataJson = JSON.stringify(data);
+  if (dataJson === lastCloudStateJson) return;
+
+  const response = await fetch(`${supabaseProjectUrl}/rest/v1/${cloudStateTable}?on_conflict=id`, {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    }),
+    body: JSON.stringify({ id: cloudStateId, data, updated_at: new Date().toISOString() }),
+  });
+
+  if (!response.ok) throw new Error(await response.text());
+  lastCloudStateJson = dataJson;
+}
+
+async function loadCloudState() {
+  const response = await fetch(`${supabaseProjectUrl}/rest/v1/${cloudStateTable}?id=eq.${cloudStateId}&select=data`, {
+    headers: supabaseHeaders(),
+  });
+
+  if (!response.ok) throw new Error(await response.text());
+
+  const rows = await response.json();
+  const cloudData = rows?.[0]?.data;
+
+  cloudReady = true;
+  if (hasSharedStateData(cloudData)) {
+    lastCloudStateJson = JSON.stringify(cloudData);
+    applyCloudState(cloudData);
+    return;
+  }
+
+  await saveCloudState();
 }
 
 function selectedPoint() {
@@ -1242,20 +1331,7 @@ function importCheckpoints(file) {
       if (!Array.isArray(parsed.points)) throw new Error("Missing points");
 
       await clearPhotoRecords();
-      state.points = parsed.points.map((point, index) => ({
-        id: point.id || makeId(),
-        title: point.title || `Checkpoint ${index + 1}`,
-        note: point.note || "",
-        openingHours: point.openingHours || "",
-        x: isNumber(point.x) ? Number(point.x) : 50,
-        y: isNumber(point.y) ? Number(point.y) : 50,
-        lat: isNumber(point.lat) ? Number(point.lat) : undefined,
-        lng: isNumber(point.lng) ? Number(point.lng) : undefined,
-        photos: normalizePhotos(point.photos).map((photo) => ({ id: photo.id, name: photo.name })),
-        done: Boolean(point.done),
-        notInside: Boolean(point.notInside),
-        createdAt: point.createdAt || new Date().toISOString(),
-      }));
+      state.points = parsed.points.map((point, index) => normalizePoint(point, index));
       await Promise.all(
         parsed.points.flatMap((point, index) => {
           const checkpointId = state.points[index].id;
@@ -1536,6 +1612,7 @@ mapModeButton.addEventListener("click", () => {
 async function startApp() {
   loadState();
   await migrateInlinePhotosToIndexedDB();
+  await loadCloudState().catch((error) => console.warn("Could not load shared map data.", error));
 
   const initialMapQuery = new URLSearchParams(window.location.search).get("map");
   if (initialMapQuery) {
