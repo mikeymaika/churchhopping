@@ -1,170 +1,581 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Main</title>
-    <link rel="stylesheet" href="styles.css?v=38">
-  </head>
-  <body>
-    <main id="mapPage" class="app-shell">
-      <section class="map-panel" aria-label="Checkpoint map">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Church Hopping</p>
-            <h1>Main</h1>
-          </div>
-          <div class="toolbar" aria-label="Map actions">
-            <div class="page-tabs" aria-label="Pages">
-              <button id="mapPageButton" class="nav-button active" type="button">Map</button>
-              <button id="routePageButton" class="nav-button" type="button">Route Planner</button>
-            </div>
-            <div class="menu-wrap">
-              <button id="menuButton" class="nav-button" type="button" aria-expanded="false">Menu</button>
-              <div id="actionsMenu" class="actions-menu is-hidden">
-                <button id="resetMapButton" type="button">Reset the current map source</button>
-                <button id="exportButton" type="button">Export your checkpoints and route data</button>
-                <label>
-                  <span>Import checkpoints and route data</span>
-                  <input id="importInput" type="file" accept="application/json,.json">
-                </label>
-                <button id="clearButton" class="menu-danger" type="button">Delete all checkpoints and reset the map data</button>
-              </div>
-            </div>
-          </div>
-        </header>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="organic/styles.css">
+  <style>
+    @font-face { font-family: "IM Fell Double Pica SC"; src: url("uploads/IMFellDoublePicaSC-Regular.ttf") format("truetype"); font-display: swap; }
+    body { margin: 0; overflow: hidden; }
+  </style>
+</helmet>
+<main data-screen-label="Map page — full-bleed" style="position: relative; width: 100vw; height: 100vh; overflow: hidden; background-color: var(--color-neutral-200); background-image: linear-gradient(rgba(70, 66, 56, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(70, 66, 56, 0.06) 1px, transparent 1px); background-size: 52px 52px">
+  <!-- real Google map (fills when loaded) -->
+  <div ref="{{ mapRef }}" style="position: absolute; inset: 0"></div>
 
-        <section class="source-bar" aria-label="Map source">
-          <form id="googleMapForm" class="google-form">
-            <input id="googleMapInput" type="text" placeholder="Address, place, coordinates, or Google Maps link" autocomplete="off">
-            <button id="googleMapSearchButton" class="primary-button" type="submit">Search</button>
-          </form>
-          <div class="map-controls" aria-label="Map controls">
-            <button id="mapModeButton" class="mode-button" type="button" aria-pressed="false">Add pins</button>
-          </div>
-          <p id="searchStatus" class="search-status" role="status" aria-live="polite"></p>
-        </section>
+  <!-- stylized fallback map art -->
+  <sc-if value="{{ showFakeMap }}" hint-placeholder-val="{{ true }}">
+  <div style="position: absolute; inset: 0; pointer-events: none">
+    <div style="position: absolute; right: -6%; bottom: -12%; width: 44%; height: 60%; border-radius: 48% 0 0 0; background: var(--color-accent-2-200)"></div>
+    <div style="position: absolute; left: 4%; top: 34%; width: 70%; height: 7px; border-radius: 999px; background: var(--color-neutral-300); transform: rotate(12deg)"></div>
+    <div style="position: absolute; left: 12%; top: 64%; width: 56%; height: 7px; border-radius: 999px; background: var(--color-neutral-300); transform: rotate(-20deg)"></div>
+    <sc-if value="{{ showMapLabels }}" hint-placeholder-val="{{ true }}">
+      <div style="position: absolute; left: 10%; top: 22%; padding: 3px 10px; border-radius: 999px; background: var(--color-neutral-100); color: var(--color-neutral-600); font-size: 11px; font-weight: 600">Old town</div>
+      <div style="position: absolute; left: 42%; bottom: 18%; padding: 3px 10px; border-radius: 999px; background: var(--color-neutral-100); color: var(--color-neutral-600); font-size: 11px; font-weight: 600">River</div>
+    </sc-if>
+  </div>
 
-        <div class="map-wrap">
-          <div id="mapSurface" class="map-surface" role="application" aria-label="Click anywhere on the map to add a checkpoint">
-            <div id="googleMapCanvas" class="google-canvas" aria-label="Google map"></div>
-            <div class="map-art" aria-hidden="true">
-              <div class="water"></div>
-              <div class="trail trail-one"></div>
-              <div class="trail trail-two"></div>
-              <div class="ridge ridge-one"></div>
-              <div class="ridge ridge-two"></div>
-              <div class="landmark camp">Camp</div>
-              <div class="landmark lookout">Lookout</div>
-              <div class="landmark bridge">Bridge</div>
-            </div>
-            <div id="markerLayer" class="marker-layer" aria-live="polite"></div>
-            <p id="emptyHint" class="empty-hint">Click the map to add your first checkpoint.</p>
-          </div>
-        </div>
-      </section>
+  <!-- pins -->
+  <sc-for list="{{ pins }}" as="pin" hint-placeholder-count="3">
+    <button type="button" onClick="{{ pin.select }}" style="position: absolute; left: {{ pin.x }}; top: {{ pin.y }}; transform: translate(-50%, -50%); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: {{ pin.bg }}; color: {{ pin.fg }}; border: 3px solid {{ pin.borderColor }}; font-size: 13px; font-weight: 700; box-shadow: {{ pin.shadow }}; cursor: pointer; font-family: var(--font-body); padding: 0">{{ pin.number }}</button>
+  </sc-for>
+  </sc-if>
 
-      <aside class="notes-panel" aria-label="Checkpoint notes">
-        <section class="editor">
-          <div class="panel-heading">
-            <p class="eyebrow">Selected</p>
-            <h2 id="editorTitle">No checkpoint selected</h2>
-          </div>
+  <!-- floating top bar -->
+  <div style="position: absolute; left: 24px; top: 24px; right: 468px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+    <div style="display: flex; align-items: center; gap: 18px; height: 54px; padding: 0 22px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-md)">
+      <span style="font-family: 'IM Fell Double Pica SC', var(--font-heading); font-size: 22px; white-space: nowrap">Church Hopping</span>
+      <span style="width: 1px; height: 22px; background: var(--color-divider)"></span>
+      <a href="index.html" style="font-size: 14px; font-weight: 700; color: var(--color-accent); white-space: nowrap; text-decoration: none">Map</a>
+      <a href="route.html" style="font-size: 14px; color: var(--color-neutral-600); white-space: nowrap; text-decoration: none" style-hover="color: var(--color-accent)">Route planner</a>
+    </div>
+    <div style="flex: 1 1 260px; min-width: 220px; display: flex; align-items: center; gap: 8px; height: 54px; padding: 0 8px 0 20px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-md)">
+      <input type="text" placeholder="Search a place or paste a maps link" style="flex: 1; min-width: 0; border: 0; background: none; color: var(--color-text); font-family: var(--font-body); font-size: 14px; outline: none">
+      <button type="button" class="btn btn-primary" style="height: 40px">Search</button>
+    </div>
+  </div>
 
-          <form id="noteForm" class="note-form">
-            <label>
-              <span>Name</span>
-              <input id="titleInput" type="text" placeholder="Checkpoint name" disabled>
-            </label>
-            <label>
-              <span>Opening hours</span>
-              <input id="openingHoursInput" type="text" placeholder="e.g. Mon-Fri 09:00-18:00" disabled>
-            </label>
-            <label>
-              <span>Notes</span>
-              <textarea id="noteInput" rows="7" placeholder="What should you remember here?" disabled></textarea>
-            </label>
-            <div class="status-row">
-              <div class="status-options">
-                <label class="toggle">
-                  <input id="doneInput" type="checkbox" disabled>
-                  <span>Done</span>
-                </label>
-                <label class="toggle">
-                  <input id="notInsideInput" type="checkbox" disabled>
-                  <span>Haven't been inside</span>
-                </label>
-              </div>
-              <p id="positionText">No position</p>
-            </div>
-            <div class="photo-section">
-              <div class="photo-actions">
-                <p>Photos</p>
-                <label class="photo-button">
-                  <span>Add photos</span>
-                  <input id="photoInput" type="file" accept="image/*" multiple disabled>
-                </label>
-              </div>
-              <div id="photoGallery" class="photo-gallery" aria-live="polite"></div>
-            </div>
-            <button id="addToRouteButton" class="primary-button wide" type="button" disabled>Add to my route</button>
-            <button id="addToMustSeeButton" class="secondary-button wide" type="button" disabled>Add to must see</button>
-            <button id="deleteButton" class="danger-button wide" type="button" disabled>Delete checkpoint</button>
-          </form>
-        </section>
+  <!-- legend -->
+  <sc-if value="{{ showLegend }}" hint-placeholder-val="{{ true }}">
+    <div style="position: absolute; left: 24px; bottom: 24px; display: flex; gap: 14px; align-items: center; padding: 10px 18px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-md)">
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-700)"><span style="width: 9px; height: 9px; border-radius: 50%; background: #29A366"></span>Visited</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-700)"><span style="width: 9px; height: 9px; border-radius: 50%; background: #474F57"></span>To visit</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-700)"><span style="width: 9px; height: 9px; border-radius: 50%; background: repeating-linear-gradient(45deg, var(--color-neutral-100) 0 2px, var(--color-accent) 2px 4px)"></span>Haven't been inside</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-700)"><span style="width: 9px; height: 9px; border-radius: 50%; background: var(--color-neutral-100); border: 2px solid var(--color-accent); box-sizing: border-box"></span>Must see</span>
+    </div>
+  </sc-if>
 
-        <section class="list-section">
-          <div class="panel-heading">
-            <p class="eyebrow">Route</p>
-            <h2>Checkpoints</h2>
-          </div>
-          <div id="checkpointList" class="checkpoint-list"></div>
-        </section>
-      </aside>
-    </main>
+  <!-- cloud sync status -->
+  <div style="position: absolute; left: 24px; bottom: 70px; padding: 8px 16px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-sm); font-size: 12px; color: var(--color-neutral-600)">{{ cloudStatus }}</div>
 
-    <section id="routePage" class="route-page is-hidden" aria-label="Route planner">
-      <header class="topbar route-topbar">
-        <div>
-          <p class="eyebrow">Route Planner</p>
-          <h1>Where to go?</h1>
-        </div>
-        <div class="toolbar">
-          <button id="routeMapButton" class="nav-button" type="button">Map</button>
-          <button id="routePlannerButton" class="nav-button active" type="button">Route Planner</button>
-          <button id="clearRouteButton" class="danger-button" type="button">Clear selected date</button>
-        </div>
-      </header>
-
-      <section class="date-selector" aria-label="Route date selector">
-        <div id="routeDateSelector" class="date-strip"></div>
-      </section>
-
-      <div class="route-layout">
-        <section class="route-main">
-          <div class="panel-heading route-plan-heading">
-            <div>
-              <p class="eyebrow">Plan</p>
-              <h2 id="routeDateTitle">Today</h2>
-            </div>
-            <label class="toggle route-done-toggle">
-              <input id="routeDoneInput" type="checkbox">
-              <span>Done</span>
-            </label>
-          </div>
-          <div id="routeList" class="route-list"></div>
-        </section>
-
-        <aside class="route-history-panel">
-          <div class="panel-heading">
-            <p class="eyebrow">History</p>
-            <h2>Plans by date</h2>
-          </div>
-          <div id="routeHistoryList" class="route-history-list"></div>
-        </aside>
+  <!-- floating right panel -->
+  <div style="position: absolute; right: 24px; top: 24px; max-height: calc(100% - 48px); width: 420px; display: flex; flex-direction: column; border-radius: calc(var(--radius-lg) * 1.15); background: var(--color-surface); box-shadow: var(--shadow-lg); overflow: hidden">
+    <div style="display: flex; padding: 6px">
+      <div style="display: flex; align-items: center; gap: 4px; width: 100%; background: var(--color-neutral-100); border-radius: 999px; padding: 4px">
+        <button type="button" onClick="{{ clickDetailsTab }}" style="flex: 1; height: 34px; border: 0; border-radius: 999px; padding: 0; font-family: var(--font-body); font-weight: 600; font-size: 14px; cursor: pointer; background: {{ detailsTabBg }}; color: {{ detailsTabColor }}">Details</button>
+        <button type="button" onClick="{{ clickListTab }}" style="flex: 1; height: 34px; border: 0; border-radius: 999px; padding: 0; font-family: var(--font-body); font-weight: 600; font-size: 14px; cursor: pointer; background: {{ listTabBg }}; color: {{ listTabColor }}">{{ listTabLabel }}</button>
       </div>
-    </section>
+    </div>
 
-    <script src="app.js?v=38"></script>
-  </body>
+    <sc-if value="{{ showDetailsPane }}" hint-placeholder-val="{{ false }}">
+      <div style="flex: 1; overflow: auto; padding: 14px 24px 24px; display: grid; gap: 16px; align-content: start">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+          <div style="display: grid; gap: 2px; justify-items: start; min-width: 0; flex: 1">
+            <span class="tag tag-accent-2" style="margin-bottom: 6px">{{ selectedKicker }}</span>
+            <sc-if value="{{ isViewing }}" hint-placeholder-val="{{ true }}">
+              <h3 style="margin: 0; font-size: 24px">{{ selectedName }}</h3>
+            </sc-if>
+            <sc-if value="{{ isEditing }}" hint-placeholder-val="{{ false }}">
+              <input type="text" class="input" value="{{ selectedName }}" onChange="{{ onName }}" style="background: var(--color-neutral-100); width: 100%; box-sizing: border-box; font-size: 16px">
+            </sc-if>
+            <sc-if value="{{ hasCreated }}" hint-placeholder-val="{{ false }}">
+              <p style="margin: 2px 0 0; font-size: 12px; color: var(--color-neutral-600)">{{ selectedAdded }}</p>
+            </sc-if>
+          </div>
+          <button type="button" onClick="{{ toggleMustSee }}" title="{{ favTitle }}" style="border: 0; background: none; cursor: pointer; padding: 6px; margin-top: 22px; line-height: 0" style-hover="transform: scale(1.12)">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="{{ heartFill }}" stroke="var(--color-accent)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+          </button>
+        </div>
+
+        <sc-if value="{{ isViewing }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; gap: 14px">
+            <sc-if value="{{ hasHours }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; gap: 2px">
+                <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); font-weight: 700">Opening hours</span>
+                <p style="margin: 0; font-size: 14px">{{ selectedHours }}</p>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasNotes }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; gap: 2px">
+                <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); font-weight: 700">Notes</span>
+                <p style="margin: 0; font-size: 14px; white-space: pre-wrap">{{ selectedNotes }}</p>
+              </div>
+            </sc-if>
+            <div style="display: grid; gap: 4px; justify-items: start">
+              <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); font-weight: 700">Status</span>
+              <span class="tag {{ statusTagClass }}">{{ statusText }}</span>
+            </div>
+            <sc-if value="{{ hasPhotos }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; gap: 6px">
+                <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); font-weight: 700">Photos</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <sc-for list="{{ photos }}" as="ph" hint-placeholder-count="2">
+                    <img class="washed" src="{{ ph.url }}" alt="" style="width: 84px; height: 84px; object-fit: cover; border-radius: var(--radius-md)">
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <div style="display: flex; gap: 8px; margin-top: 4px">
+              <button type="button" class="btn btn-primary" onClick="{{ startEdit }}" style="flex: 1; min-height: 44px">Edit</button>
+              <button type="button" class="btn btn-secondary" style="flex: 1; min-height: 44px">Add to route</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isEditing }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; gap: 16px">
+            <div class="field">
+              <label>Opening hours</label>
+              <input type="text" class="input" value="{{ selectedHours }}" onChange="{{ onHours }}" placeholder="e.g. Mon–Fri 09:00–18:00" style="background: var(--color-neutral-100)">
+            </div>
+            <div class="field">
+              <label>Notes</label>
+              <textarea class="input" rows="4" value="{{ selectedNotes }}" onChange="{{ onNotes }}" placeholder="What should you remember here?" style="min-height: 88px; border-radius: var(--radius-md); background: var(--color-neutral-100)"></textarea>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+              <label class="radio"><input type="checkbox" checked="{{ selectedVisited }}" onChange="{{ toggleVisited }}"><span class="dot"></span>Visited</label>
+              <label class="radio"><input type="checkbox" checked="{{ selectedNotInside }}" onChange="{{ toggleNotInside }}"><span class="dot"></span>Haven't been inside</label>
+            </div>
+            <div style="display: grid; gap: 8px" onDragOver="{{ photoDragOver }}" onDragLeave="{{ photoDragLeave }}" onDrop="{{ photoDrop }}">
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <p style="margin: 0; font-size: 12px; color: color-mix(in srgb, var(--color-text) 70%, transparent)">Photos</p>
+                <button type="button" class="btn btn-ghost" onClick="{{ pickPhotos }}" style="min-height: 30px; font-size: 13px">Add</button>
+              </div>
+              <sc-if value="{{ hasPhotos }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <sc-for list="{{ photos }}" as="ph" hint-placeholder-count="2">
+                    <img class="washed" src="{{ ph.url }}" alt="" style="width: 84px; height: 84px; object-fit: cover; border-radius: var(--radius-md)">
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ noPhotos }}" hint-placeholder-val="{{ true }}">
+                <div style="height: 84px; border: 1.5px dashed {{ dropBorder }}; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-neutral-500); font-size: 12px; background: {{ dropBg }}">Drag photos here, or press Add</div>
+              </sc-if>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 4px">
+              <button type="button" class="btn btn-primary" onClick="{{ stopEdit }}" style="flex: 1; min-height: 44px">Done</button>
+              <button type="button" class="btn btn-ghost" onClick="{{ deleteCheckpoint }}" style="flex: 1; color: var(--color-neutral-600)">Delete checkpoint</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showListPane }}" hint-placeholder-val="{{ false }}">
+      <div style="flex: 1; overflow: auto; padding: 22px 24px 24px; display: grid; gap: 8px; align-content: start">
+        <sc-for list="{{ listItems }}" as="item" hint-placeholder-count="3">
+          <button type="button" onClick="{{ item.select }}" style="display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 12px; align-items: center; padding: 11px 14px; border: 0; border-radius: 999px; background: {{ item.rowBg }}; cursor: pointer; text-align: left; font-family: var(--font-body); width: 100%" style-hover="background: var(--color-accent-100)">
+            <span style="display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: {{ item.dotBg }}; color: {{ item.dotFg }}; border: 2px solid {{ item.dotBorder }}; font-size: 11px; font-weight: 700; box-sizing: border-box"><span style="display: grid; place-items: center; min-width: 15px; height: 15px; border-radius: 50%; background: {{ item.dotCoreBg }}">{{ item.number }}</span></span>
+            <span style="min-width: 0">
+              <span style="display: flex; align-items: center; gap: 8px">
+                <strong style="font-size: 14px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.name }}</strong>
+                <sc-if value="{{ item.mustSee }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent">Must see</span></sc-if>
+              </span>
+              <span style="display: block; margin-top: 1px; font-size: 12px; color: var(--color-neutral-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ item.preview }}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showLegend&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Map&quot;}, &quot;showMapLabels&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Map&quot;}}">
+class Component extends DCLogic {
+  mapRef = React.createRef();
+  gmap = null;
+  gmarkers = [];
+
+  state = {
+    selectedId: 2,
+    tab: "details",
+    panelOpen: false,
+    editing: false,
+    dragging: false,
+    googleActive: false,
+    cloudStatus: "Loading your checkpoints…",
+    points: [
+      { id: 1, number: 1, x: "22%", y: "42%", name: "St. Mary's Basilica", hours: "Daily 08:00–19:00", notes: "Twin towers, gothic nave. Went inside in June.", visited: true, notInside: false, mustSee: false },
+      { id: 2, number: 2, x: "44%", y: "60%", name: "Old Town Chapel", hours: "Mon–Sat 09:00–17:00", notes: "Frescoes behind the altar. Organ concerts on Fridays.", visited: false, notInside: false, mustSee: false },
+      { id: 3, number: 3, x: "58%", y: "28%", name: "Cathedral of St. James", hours: "", notes: "Crypt open only on weekends.", visited: false, notInside: true, mustSee: true }
+    ]
+  };
+
+  async componentDidMount() {
+    try {
+      const mod = await import("./supabase-data.js");
+      this.cloudMod = mod;
+      const data = await mod.loadCloudState();
+      this.cloudData = data;
+      if (!data || !Array.isArray(data.points) || !data.points.length) {
+        this.setState({ cloudStatus: "Cloud is empty — showing sample data" });
+        return;
+      }
+      const stars = mod.mustSeeIds(data);
+      this.raw = new Map((data.points || []).map(p => [p.id, p]));
+      const projected = mod.projectPoints(data.points);
+      const points = projected.map((p, i) => ({
+        id: p.id,
+        number: i + 1,
+        x: p.screenX,
+        y: p.screenY,
+        name: p.title || `Checkpoint ${i + 1}`,
+        hours: p.openingHours || "",
+        notes: p.note || "",
+        visited: Boolean(p.done),
+        notInside: !p.done && Boolean(p.notInside),
+        mustSee: stars.has(p.id),
+        photos: (p.photos || []).map(ph => ph.url || ph.src).filter(Boolean),
+        createdAt: p.createdAt || "",
+        lat: Number(p.lat),
+        lng: Number(p.lng)
+      }));
+      this.setState({
+        points,
+        selectedId: points[0].id,
+        cloudStatus: `Synced · ${points.length} checkpoint${points.length === 1 ? "" : "s"}`
+      });
+      this.initGoogleMap(data.googleMapCenter, data.googleMapZoom);
+    } catch (e) {
+      console.warn("Cloud load failed", e);
+      this.setState({ cloudStatus: "Couldn't reach the cloud — showing sample data" });
+    }
+  }
+
+  loadMapsApi() {
+    if (window.google?.maps) return Promise.resolve();
+    if (window.__ghMapsPromise) return window.__ghMapsPromise;
+    window.__ghMapsPromise = new Promise((resolve, reject) => {
+      window.__ghMapsInit = resolve;
+      const sc = document.createElement("script");
+      sc.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyCPD066ERnxYx4CQQQxWhgeGVecnWz6nik&callback=__ghMapsInit";
+      sc.async = true;
+      sc.onerror = reject;
+      document.head.appendChild(sc);
+    });
+    return window.__ghMapsPromise;
+  }
+
+  async initGoogleMap(center, zoom) {
+    try {
+      window.gm_authFailure = () => {
+        this.setState({ googleActive: false, cloudStatus: "Google Maps unavailable (key quota) — showing sketch map" });
+      };
+      await this.loadMapsApi();
+      if (!this.mapRef.current || this.gmap) return;
+      this.gmap = new google.maps.Map(this.mapRef.current, {
+        center: center || { lat: 51.5072, lng: -0.1276 },
+        zoom: zoom || 13,
+        fullscreenControl: false,
+        streetViewControl: false,
+        mapTypeControl: false,
+        clickableIcons: false
+      });
+      this.gmap.addListener("click", e => this.promptAddPin(e.latLng));
+      this.setState({ googleActive: true });
+      this.syncMarkers();
+    } catch (e) {
+      console.warn("Google Maps failed to load, keeping stylized map", e);
+    }
+  }
+
+  scheduleSave() {
+    if (!this.cloudData || !this.cloudMod) return;
+    clearTimeout(this._saveT);
+    this.setState({ cloudStatus: "Saving…" });
+    this._saveT = setTimeout(() => this.saveNow(), 1200);
+  }
+
+  async saveNow() {
+    try {
+      const d = this.cloudData;
+      d.points = this.state.points.map(p => {
+        const r = this.raw?.get(p.id) || { id: p.id, photos: [] };
+        this.raw?.set(p.id, r);
+        r.title = p.name;
+        r.openingHours = p.hours;
+        r.note = p.notes;
+        r.done = p.visited;
+        r.notInside = p.notInside;
+        if (p.createdAt && !r.createdAt) r.createdAt = p.createdAt;
+        if (Number.isFinite(p.lat)) { r.lat = p.lat; r.lng = p.lng; }
+        const existing = new Set((r.photos || []).map(ph => ph.url || ph.src));
+        (p.photos || []).forEach(src => {
+          if (!existing.has(src)) (r.photos = r.photos || []).push({ id: "photo-" + Date.now() + Math.random().toString(36).slice(2, 7), src });
+        });
+        return r;
+      });
+      const liveIds = new Set(this.state.points.map(p => p.id));
+      d.routePlans = d.routePlans || {};
+      Object.values(d.routePlans).forEach(plan => {
+        if (plan?.steps) plan.steps = plan.steps.filter(st => liveIds.has(st.checkpointId));
+      });
+      const ms = d.routePlans["must-see"] = d.routePlans["must-see"] || { steps: [] };
+      ms.steps = ms.steps || [];
+      const starred = new Set(this.state.points.filter(p => p.mustSee).map(p => p.id));
+      ms.steps = ms.steps.filter(st => starred.has(st.checkpointId));
+      const inPlan = new Set(ms.steps.map(st => st.checkpointId));
+      starred.forEach(id => {
+        if (!inPlan.has(id)) ms.steps.push({ id: "step-" + Date.now() + Math.random().toString(36).slice(2, 7), checkpointId: id });
+      });
+      await this.cloudMod.saveCloudState(d);
+      const t = new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
+      this.setState({ cloudStatus: `All changes saved · ${t}` });
+    } catch (e) {
+      console.warn("Cloud save failed", e);
+      this.setState({ cloudStatus: "Couldn't save — retrying…" });
+      clearTimeout(this._saveT);
+      this._saveT = setTimeout(() => this.saveNow(), 5000);
+    }
+  }
+
+  addPhotoFiles(files) {
+    Array.from(files || []).filter(f => f.type && f.type.startsWith("image/")).forEach(f => {
+      const r = new FileReader();
+      r.onload = () => {
+        this.setState(s => ({
+          points: s.points.map(p => (p.id === s.selectedId ? { ...p, photos: [...(p.photos || []), r.result] } : p))
+        }));
+        this.scheduleSave();
+      };
+      r.readAsDataURL(f);
+    });
+  }
+
+  promptAddPin(latLng) {
+    if (this.pinPrompt) this.pinPrompt.close();
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "font-family:var(--font-body,sans-serif);display:grid;gap:10px;padding:4px 2px;";
+    const q = document.createElement("strong");
+    q.textContent = "Add a pin?";
+    q.style.cssText = "font-size:14px;color:#1e1f1e;";
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;";
+    const yes = document.createElement("button");
+    yes.textContent = "Yes";
+    yes.style.cssText = "flex:1;border:0;border-radius:999px;padding:8px 18px;background:#5c6670;color:#f0f0ee;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;";
+    const no = document.createElement("button");
+    no.textContent = "No";
+    no.style.cssText = "flex:1;border:1.5px solid #5c6670;border-radius:999px;padding:8px 18px;background:transparent;color:#5c6670;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;";
+    yes.onclick = () => { this.pinPrompt.close(); this.addPin(latLng); };
+    no.onclick = () => this.pinPrompt.close();
+    row.appendChild(yes); row.appendChild(no);
+    wrap.appendChild(q); wrap.appendChild(row);
+    this.pinPrompt = new google.maps.InfoWindow({ content: wrap, position: latLng });
+    this.pinPrompt.open(this.gmap);
+  }
+
+  addPin(latLng) {
+    const id = "pin-" + Date.now();
+    this.setState(s => ({
+      points: [...s.points, {
+        id, number: s.points.length + 1,
+        x: "50%", y: "50%",
+        name: "New checkpoint", hours: "", notes: "",
+        visited: false, notInside: false, mustSee: false, photos: [],
+        createdAt: new Date().toISOString(),
+        lat: latLng.lat(), lng: latLng.lng()
+      }],
+      selectedId: id, tab: "details", panelOpen: true, editing: true
+    }));
+    this.scheduleSave();
+  }
+
+  markerSignature() {
+    const s = this.state;
+    return s.points.map(p => [p.id, p.lat, p.lng, p.visited, p.notInside, p.mustSee, p.id === s.selectedId ? 1 : 0].join(":")).join("|");
+  }
+
+  syncMarkers() {
+    if (!this.gmap || !window.google?.maps) return;
+    this.gmarkers.forEach(m => m.setMap(null));
+    this.gmarkers = [];
+    const bounds = new google.maps.LatLngBounds();
+    let hasAny = false;
+    this.state.points.forEach(p => {
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return;
+      hasAny = true;
+      const selected = p.id === this.state.selectedId;
+      let fill = "#474F57", labelColor = "#f7f7f5", stroke = "#f7f7f5";
+      if (p.visited) { fill = "#29A366"; }
+      else if (p.mustSee) { fill = "#f7f7f5"; labelColor = "#1e1f1e"; stroke = "#5c6670"; }
+      let icon;
+      if (p.notInside && !p.visited) {
+        labelColor = "#f7f7f5";
+        const size = selected ? 40 : 34;
+        const strokeColor = selected ? "#1e1f1e" : (p.mustSee ? "#5c6670" : "#f7f7f5");
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><defs><pattern id="s" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#a0abb6"/><rect width="3" height="6" fill="#5c6670"/></pattern></defs><circle cx="${size / 2}" cy="${size / 2}" r="${(size - 6) / 2}" fill="url(#s)" stroke="${strokeColor}" stroke-width="3"/></svg>`;
+        icon = {
+          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+          scaledSize: new google.maps.Size(size, size),
+          anchor: new google.maps.Point(size / 2, size / 2),
+          labelOrigin: new google.maps.Point(size / 2, size / 2)
+        };
+      } else {
+        icon = {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: selected ? 15 : 12,
+          fillColor: fill,
+          fillOpacity: 1,
+          strokeColor: selected ? "#201e1d" : stroke,
+          strokeWeight: selected ? 3 : 2.5
+        };
+      }
+      const marker = new google.maps.Marker({
+        map: this.gmap,
+        position: { lat: p.lat, lng: p.lng },
+        label: { text: String(p.number), color: labelColor, fontSize: "12px", fontWeight: "700" },
+        icon,
+        title: p.name,
+        zIndex: selected ? 100 : 10
+      });
+        marker.addListener("click", () => this.setState({ selectedId: p.id, tab: "details", panelOpen: true, editing: false }));
+      this.gmarkers.push(marker);
+      bounds.extend({ lat: p.lat, lng: p.lng });
+    });
+    if (hasAny && !this._didFit) {
+      this._didFit = true;
+      if (this.gmarkers.length > 1) this.gmap.fitBounds(bounds, 80);
+      else { this.gmap.setCenter(bounds.getCenter()); this.gmap.setZoom(15); }
+    }
+  }
+
+  componentDidUpdate() {
+    const sig = this.markerSignature();
+    if (sig !== this._lastSig) {
+      this._lastSig = sig;
+      this.syncMarkers();
+    }
+  }
+
+  sel() {
+    return this.state.points.find(p => p.id === this.state.selectedId) || this.state.points[0]
+      || { id: null, number: 0, name: "No checkpoints", hours: "", notes: "", visited: false, notInside: false, mustSee: false, photos: [] };
+  }
+
+  updateSel(patch) {
+    this.setState(s => ({
+      points: s.points.map(p => (p.id === s.selectedId ? { ...p, ...patch } : p))
+    }));
+    this.scheduleSave();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const sel = this.sel();
+    const cssVar = n => `var(--color-${n})`;
+
+    const pinLook = p => {
+      if (p.visited) return { bg: "#29A366", fg: cssVar("bg"), borderColor: cssVar("bg") };
+      if (p.notInside) return {
+        bg: "repeating-linear-gradient(45deg, var(--color-neutral-100) 0 4px, var(--color-accent) 4px 8px)",
+        fg: cssVar("text"),
+        borderColor: p.mustSee ? cssVar("accent") : cssVar("bg")
+      };
+      if (p.mustSee) return { bg: cssVar("neutral-100"), fg: cssVar("text"), borderColor: cssVar("accent") };
+      return { bg: "#474F57", fg: cssVar("bg"), borderColor: cssVar("bg") };
+    };
+
+    const pins = s.points.map(p => {
+      const look = pinLook(p);
+      const selected = p.id === s.selectedId;
+      return {
+        ...p, ...look,
+        shadow: selected
+          ? "0 0 0 6px color-mix(in srgb, var(--color-accent) 28%, transparent), var(--shadow-sm)"
+          : "var(--shadow-sm)",
+        select: () => this.setState({ selectedId: p.id, tab: "details", panelOpen: true, editing: false })
+      };
+    });
+
+    const listItems = s.points.map(p => {
+      const look = pinLook(p);
+      return {
+        number: p.number,
+        name: p.name,
+        mustSee: p.mustSee,
+        preview: p.notes || p.hours || "No notes yet",
+        rowBg: p.id === s.selectedId ? "var(--color-accent-100)" : "var(--color-neutral-100)",
+        dotBg: look.bg,
+        dotFg: look.fg,
+        dotBorder: p.mustSee ? "var(--color-accent)" : "transparent",
+        dotCoreBg: p.notInside && !p.visited ? "var(--color-neutral-100)" : "transparent",
+        select: () => this.setState({ selectedId: p.id, tab: "details", panelOpen: true, editing: false })
+      };
+    });
+
+    const status = sel.visited ? "visited" : sel.notInside ? "seen from outside" : "not yet visited";
+    const meta = [sel.hours || "No opening hours yet", status].join(" · ");
+
+    return {
+      mapRef: this.mapRef,
+      showFakeMap: !s.googleActive,
+      cloudStatus: s.cloudStatus,
+      showLegend: this.props.showLegend ?? true,
+      showMapLabels: this.props.showMapLabels ?? true,
+      pins,
+      listItems,
+      listTabLabel: `Checkpoints · ${s.points.length}`,
+      showDetailsPane: s.panelOpen && s.tab === "details",
+      showListPane: s.panelOpen && s.tab === "list",
+      detailsTabBg: s.panelOpen && s.tab === "details" ? "var(--color-accent)" : "transparent",
+      detailsTabColor: s.panelOpen && s.tab === "details" ? "var(--color-bg)" : "var(--color-neutral-600)",
+      listTabBg: s.panelOpen && s.tab === "list" ? "var(--color-accent)" : "transparent",
+      listTabColor: s.panelOpen && s.tab === "list" ? "var(--color-bg)" : "var(--color-neutral-600)",
+      clickDetailsTab: () => this.setState(st => ({ tab: "details", panelOpen: !(st.panelOpen && st.tab === "details"), editing: false })),
+      clickListTab: () => this.setState(st => ({ tab: "list", panelOpen: !(st.panelOpen && st.tab === "list"), editing: false })),
+      isViewing: !s.editing,
+      isEditing: s.editing,
+      startEdit: () => this.setState({ editing: true }),
+      deleteCheckpoint: () => { this.scheduleSave(); this.setState(st => {
+        const points = st.points.filter(p => p.id !== st.selectedId).map((p, i) => ({ ...p, number: i + 1 }));
+        return { points, selectedId: points[0]?.id ?? null, editing: false, panelOpen: points.length > 0 && st.panelOpen };
+      }); },
+      stopEdit: () => this.setState({ editing: false }),
+      heartFill: sel.mustSee ? "var(--color-accent)" : "none",
+      favTitle: sel.mustSee ? "Remove from must see" : "Add to must see",
+      hasCreated: Boolean(sel.createdAt),
+      selectedAdded: sel.createdAt
+        ? "Added " + new Date(sel.createdAt).toLocaleString("en", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "",
+      hasHours: Boolean(sel.hours),
+      hasNotes: Boolean(sel.notes),
+      photos: (sel.photos || []).map(u => ({ url: u })),
+      hasPhotos: (sel.photos || []).length > 0,
+      noPhotos: (sel.photos || []).length === 0,
+      pickPhotos: () => {
+        const inp = document.createElement("input");
+        inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+        inp.onchange = () => this.addPhotoFiles(inp.files);
+        inp.click();
+      },
+      photoDragOver: e => { e.preventDefault(); if (!s.dragging) this.setState({ dragging: true }); },
+      photoDragLeave: () => this.setState({ dragging: false }),
+      photoDrop: e => { e.preventDefault(); this.setState({ dragging: false }); this.addPhotoFiles(e.dataTransfer.files); },
+      dropBorder: s.dragging ? "var(--color-accent)" : "var(--color-divider)",
+      dropBg: s.dragging ? "var(--color-accent-100)" : "transparent",
+      statusText: sel.visited ? "Visited" : sel.notInside ? "Haven't been inside" : "Not visited",
+      statusTagClass: sel.visited ? "tag-accent-2" : sel.notInside ? "tag-neutral" : "tag-outline",
+      selectedKicker: `Checkpoint ${sel.number}`,
+      selectedName: sel.name,
+      selectedHours: sel.hours,
+      selectedNotes: sel.notes,
+      selectedVisited: sel.visited,
+      selectedNotInside: sel.notInside,
+      onName: e => this.updateSel({ name: e.target.value }),
+      onHours: e => this.updateSel({ hours: e.target.value }),
+      onNotes: e => this.updateSel({ notes: e.target.value }),
+      toggleVisited: () => this.updateSel({ visited: !sel.visited, notInside: false }),
+      toggleNotInside: () => this.updateSel({ notInside: !sel.notInside, visited: false }),
+      toggleMustSee: () => this.updateSel({ mustSee: !sel.mustSee })
+    };
+  }
+}
+</script>
+</body>
 </html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="organic/styles.css">
+  <style>
+    @font-face { font-family: "IM Fell Double Pica SC"; src: url("uploads/IMFellDoublePicaSC-Regular.ttf") format("truetype"); font-display: swap; }
+    body { margin: 0; }
+  </style>
+</helmet>
+<main data-screen-label="Route planner" style="min-height: 100vh; background: var(--color-bg); padding: 24px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box">
+
+  <!-- floating top bar, same chrome as the map page -->
+  <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+    <div style="display: flex; align-items: center; gap: 18px; height: 54px; padding: 0 22px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-md)">
+      <span style="font-family: 'IM Fell Double Pica SC', var(--font-heading); font-size: 17px; white-space: nowrap">Church Hopping</span>
+      <span style="width: 1px; height: 22px; background: var(--color-divider)"></span>
+      <a href="index.html" style="font-size: 14px; color: var(--color-neutral-600); white-space: nowrap; text-decoration: none" style-hover="color: var(--color-accent)">Map</a>
+      <a href="route.html" style="font-size: 14px; font-weight: 700; color: var(--color-accent); white-space: nowrap; text-decoration: none">Route planner</a>
+    </div>
+    <div style="flex: 1"></div>
+    <button type="button" class="btn" onClick="{{ clearDate }}" style="height: 54px; border-radius: 999px; background: var(--color-neutral-100); box-shadow: var(--shadow-md); padding: 0 22px; white-space: nowrap; color: var(--color-neutral-600)" style-hover="color: var(--color-accent-700)">Clear selected date</button>
+  </div>
+
+  <!-- heading -->
+  <div style="display: grid; gap: 2px; padding: 4px 8px 0">
+    <span class="tag tag-accent-2" style="justify-self: start; margin-bottom: 6px">Route planner</span>
+    <h1 style="margin: 0; font-size: 34px">Where to go?</h1>
+    <p style="margin: 4px 0 0; font-size: 12px; color: var(--color-neutral-600)">{{ cloudStatus }}</p>
+  </div>
+
+  <!-- date strip -->
+  <div style="display: flex; gap: 10px; overflow-x: auto; padding: 4px 8px 8px">
+    <sc-for list="{{ dates }}" as="d" hint-placeholder-count="5">
+      <button type="button" onClick="{{ d.select }}" style="display: grid; gap: 1px; min-width: 120px; border: 2px solid {{ d.borderColor }}; border-radius: 999px; background: {{ d.bg }}; color: var(--color-text); padding: 10px 18px; text-align: left; cursor: pointer; font-family: var(--font-body); flex: 0 0 auto" style-hover="border-color: var(--color-accent)">
+        <strong style="font-size: 14px">{{ d.label }}</strong>
+        <span style="font-size: 12px; color: var(--color-neutral-600)">{{ d.sub }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <!-- plan + history -->
+  <div style="flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start">
+    <!-- plan panel -->
+    <section style="border-radius: calc(var(--radius-lg) * 1.15); background: var(--color-surface); box-shadow: var(--shadow-lg); padding: 28px; display: grid; gap: 18px">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+        <div style="display: grid; gap: 2px">
+          <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); font-weight: 700">Plan</span>
+          <h2 style="margin: 0; font-size: 26px">{{ planTitle }}</h2>
+        </div>
+        <label class="radio" style="white-space: nowrap; padding-top: 6px"><input type="checkbox" checked="{{ dayDone }}" onChange="{{ toggleDayDone }}" /><span class="dot"></span>Done</label>
+      </div>
+
+      <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; gap: 12px">
+          <sc-for list="{{ steps }}" as="step" hint-placeholder-count="3">
+            <article style="display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 14px; border-radius: var(--radius-lg); background: var(--color-neutral-100); padding: 16px 18px">
+              <span style="display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: {{ step.dotBg }}; color: {{ step.dotFg }}; border: 2px solid {{ step.dotBorder }}; font-weight: 700; font-size: 13px; box-sizing: border-box">{{ step.number }}</span>
+              <div style="display: grid; min-width: 0; gap: 7px">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                  <strong style="font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ step.name }}</strong>
+                  <sc-if value="{{ step.mustSee }}" hint-placeholder-val="{{ false }}"><span class="tag tag-accent">Must see</span></sc-if>
+                </div>
+                <span style="font-size: 13px; color: var(--color-neutral-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ step.meta }}</span>
+                <textarea class="input" rows="2" value="{{ step.note }}" onChange="{{ step.onNote }}" placeholder="Plan notes for this stop" style="min-height: 56px; border-radius: var(--radius-md); background: var(--color-bg)"></textarea>
+              </div>
+              <div style="display: grid; align-content: start; gap: 6px">
+                <button type="button" class="btn btn-secondary" onClick="{{ step.moveUp }}" style="min-height: 34px; padding: 0 14px">Up</button>
+                <button type="button" class="btn btn-secondary" onClick="{{ step.moveDown }}" style="min-height: 34px; padding: 0 14px">Down</button>
+                <button type="button" class="btn btn-ghost" onClick="{{ step.remove }}" style="min-height: 34px; color: var(--color-neutral-600)">Remove</button>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noSteps }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 40px 0; display: grid; place-items: center; gap: 4px">
+          <p style="margin: 0; font-size: 14px; color: var(--color-neutral-600)">Nothing planned for this day yet.</p>
+          <p style="margin: 0; font-size: 13px; color: var(--color-neutral-500)">Add checkpoints from the map page.</p>
+        </div>
+      </sc-if>
+    </section>
+
+    <!-- history panel -->
+    <aside style="border-radius: calc(var(--radius-lg) * 1.15); background: var(--color-surface); box-shadow: var(--shadow-lg); padding: 28px; display: grid; gap: 14px; align-content: start">
+      <div style="display: grid; gap: 2px">
+        <span style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent-2-700); font-weight: 700">History</span>
+        <h2 style="margin: 0; font-size: 22px">Plans by date</h2>
+      </div>
+      <div style="display: grid; gap: 8px">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+          <button type="button" onClick="{{ h.select }}" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; border-radius: 999px; background: {{ h.bg }}; padding: 12px 18px; text-align: left; cursor: pointer; font-family: var(--font-body)" style-hover="background: var(--color-accent-100)">
+            <span style="display: inline-flex; min-width: 0; align-items: center; gap: 8px">
+              <strong style="font-size: 14px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ h.label }}</strong>
+              <sc-if value="{{ h.done }}" hint-placeholder-val="{{ false }}">
+                <span style="display: inline-grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: #29A366; color: var(--color-bg); font-size: 11px; font-weight: 700; line-height: 1">✓</span>
+              </sc-if>
+            </span>
+            <span style="font-size: 12px; color: var(--color-neutral-600); white-space: nowrap">{{ h.count }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </aside>
+  </div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    activeKey: "today",
+    cloudStatus: "Loading your plans…",
+    orderedKeys: ["must-see", "today", "tomorrow", "2026-07-12"],
+    plans: {
+      "must-see": {
+        label: "Must see", sub: "Starred checkpoints", done: false,
+        steps: [
+          { id: 31, name: "Cathedral of St. James", meta: "Crypt open only on weekends", note: "", mustSee: true, visited: false, notInside: true }
+        ]
+      },
+      "today": {
+        label: "Today", sub: "Wed, Jul 15", done: false,
+        steps: [
+          { id: 11, name: "St. Mary's Basilica", meta: "Daily 08:00–19:00", note: "Morning light through the east windows.", mustSee: false, visited: true, notInside: false },
+          { id: 12, name: "Old Town Chapel", meta: "Mon–Sat 09:00–17:00", note: "Organ concert at 17:00 — arrive early.", mustSee: false, visited: false, notInside: false },
+          { id: 13, name: "Cathedral of St. James", meta: "Crypt open only on weekends", note: "", mustSee: true, visited: false, notInside: true }
+        ]
+      },
+      "tomorrow": { label: "Tomorrow", sub: "Thu, Jul 16", done: false, steps: [] },
+      "2026-07-12": { label: "Sun, Jul 12", sub: "3 days ago", done: true,
+        steps: [
+          { id: 21, name: "Riverside Monastery", meta: "Gardens close at dusk", note: "Cloister walk was the highlight.", mustSee: false, visited: true, notInside: false },
+          { id: 22, name: "Chapel of the Bridge", meta: "", note: "", mustSee: false, visited: true, notInside: false }
+        ]
+      }
+    }
+  };
+
+  todayKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }
+
+  dateLabel(key) {
+    const today = this.todayKey();
+    const d = new Date(`${key}T12:00:00`);
+    const tomorrow = new Date(`${today}T12:00:00`); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+    if (key === today) return "Today";
+    if (key === tomorrowKey) return "Tomorrow";
+    return d.toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  async componentDidMount() {
+    try {
+      const mod = await import("./supabase-data.js");
+      const data = await mod.loadCloudState();
+      if (!data) {
+        this.setState({ cloudStatus: "Cloud is empty — showing sample data" });
+        return;
+      }
+      const byId = new Map((data.points || []).map(p => [p.id, p]));
+      const stars = mod.mustSeeIds(data);
+      const rawPlans = data.routePlans || {};
+      const today = this.todayKey();
+
+      const buildSteps = plan => (plan?.steps || []).map(step => {
+        const cp = byId.get(step.checkpointId);
+        const meta = cp
+          ? (cp.openingHours || cp.note || (Number.isFinite(Number(cp.lat)) ? `${Number(cp.lat).toFixed(5)}, ${Number(cp.lng).toFixed(5)}` : ""))
+          : "Checkpoint was deleted";
+        return {
+          id: step.id,
+          name: cp?.title || step.title || "Checkpoint",
+          meta,
+          note: step.note || "",
+          mustSee: stars.has(step.checkpointId),
+          visited: Boolean(cp?.done),
+          notInside: Boolean(cp && !cp.done && cp.notInside)
+        };
+      });
+
+      const dateKeys = Object.keys(rawPlans)
+        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+        .filter(k => rawPlans[k]?.steps?.length || rawPlans[k]?.done);
+      if (!dateKeys.includes(today)) dateKeys.push(today);
+      dateKeys.sort((a, b) => b.localeCompare(a));
+
+      const plans = {};
+      plans["must-see"] = {
+        label: "Must see", sub: "Starred checkpoints",
+        done: false, steps: buildSteps(rawPlans["must-see"])
+      };
+      dateKeys.forEach(k => {
+        const p = rawPlans[k];
+        plans[k] = {
+          label: this.dateLabel(k),
+          sub: new Date(`${k}T12:00:00`).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" }),
+          done: Boolean(p?.done),
+          steps: buildSteps(p)
+        };
+      });
+
+      const orderedKeys = ["must-see", ...dateKeys];
+      this.setState({
+        plans, orderedKeys,
+        activeKey: plans[today] ? today : orderedKeys[0],
+        cloudStatus: `Synced · ${dateKeys.length} plan${dateKeys.length === 1 ? "" : "s"}`
+      });
+    } catch (e) {
+      console.warn("Cloud load failed", e);
+      this.setState({ cloudStatus: "Couldn't reach the cloud — showing sample data" });
+    }
+  }
+
+  plan() { return this.state.plans[this.state.activeKey]; }
+
+  updatePlan(patch) {
+    this.setState(s => ({
+      plans: { ...s.plans, [s.activeKey]: { ...s.plans[s.activeKey], ...patch } }
+    }));
+  }
+
+  updateSteps(fn) { this.updatePlan({ steps: fn(this.plan().steps.slice()) }); }
+
+  renderVals() {
+    const s = this.state;
+    const plan = this.plan();
+
+    const dotLook = st => {
+      if (st.visited) return { dotBg: "#29A366", dotFg: "var(--color-bg)", dotBorder: "transparent" };
+      if (st.mustSee) return { dotBg: "var(--color-neutral-100)", dotFg: "var(--color-text)", dotBorder: "var(--color-accent)" };
+      return { dotBg: "var(--color-accent)", dotFg: "var(--color-bg)", dotBorder: "transparent" };
+    };
+
+    const orderedKeys = s.orderedKeys.filter(k => s.plans[k]);
+
+    const dates = orderedKeys.map(key => {
+      const p = s.plans[key];
+      const active = key === s.activeKey;
+      return {
+        label: p.label, sub: p.sub,
+        bg: active ? "var(--color-accent-100)" : "var(--color-neutral-100)",
+        borderColor: active ? "var(--color-accent)" : "transparent",
+        select: () => this.setState({ activeKey: key })
+      };
+    });
+
+    const steps = plan.steps.map((st, i) => ({
+      ...st, ...dotLook(st),
+      number: i + 1,
+      meta: st.meta || "No opening hours noted",
+      onNote: e => this.updateSteps(list => list.map(x => (x.id === st.id ? { ...x, note: e.target.value } : x))),
+      moveUp: () => this.updateSteps(list => {
+        if (i === 0) return list;
+        [list[i - 1], list[i]] = [list[i], list[i - 1]]; return list;
+      }),
+      moveDown: () => this.updateSteps(list => {
+        if (i === list.length - 1) return list;
+        [list[i + 1], list[i]] = [list[i], list[i + 1]]; return list;
+      }),
+      remove: () => this.updateSteps(list => list.filter(x => x.id !== st.id))
+    }));
+
+    const history = orderedKeys.filter(k => k !== "must-see").map(key => {
+      const p = s.plans[key];
+      return {
+        label: p.label,
+        done: p.done,
+        count: `${p.steps.length} ${p.steps.length === 1 ? "stop" : "stops"}`,
+        bg: key === s.activeKey ? "var(--color-accent-100)" : "var(--color-neutral-100)",
+        select: () => this.setState({ activeKey: key })
+      };
+    });
+
+    return {
+      cloudStatus: s.cloudStatus,
+      dates, steps, history,
+      planTitle: plan.label,
+      dayDone: plan.done,
+      toggleDayDone: () => this.updatePlan({ done: !plan.done }),
+      clearDate: () => this.updatePlan({ steps: [], done: false }),
+      hasSteps: plan.steps.length > 0,
+      noSteps: plan.steps.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>
